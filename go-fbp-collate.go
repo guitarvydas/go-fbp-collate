@@ -35,36 +35,38 @@ func main() {
 	resultPrinter(ccd)
 }
 
-func headerReader (out chan string) {
+func headerReader(out chan<- string) {
 	// fake reading of headers from a file, just generate some headers
 	out <- "A"
 	out <- "B"
 	out <- "C"
 }
 
-func recordReader (out chan string) {
+func recordReader(out chan<- string) {
 	// fake reading records - first character is the key (header)
-	for i := 0 ; i < 5 ; i ++ {
+	for i := 0; i < 5; i++ {
 		out <- fmt.Sprintf("A ++%v++", i)
 	}
-	for i := 15 ; i < 21 ; i ++ {
+	for i := 15; i < 21; i++ {
 		out <- fmt.Sprintf("B ++%v++", i)
 	}
-	for i := 25 ; i < 32 ; i ++ {
+	for i := 25; i < 32; i++ {
 		out <- fmt.Sprintf("C ++%v++", i)
 	}
 	out <- "EOF"
 }
 
-func resultPrinter (in chan string) {
+func resultPrinter(in <-chan string) {
 	for {
-		merged := <- in
-		if merged == "EOF" { break }
-		fmt.Println (merged)
+		merged := <-in
+		if merged == "EOF" {
+			break
+		}
+		fmt.Println(merged)
 	}
 }
 
-func collate (in0 chan string, in1 chan string,  out chan string) {
+func collate(in0 <-chan string, in1 <-chan string, out chan<- string) {
 	var hdr, rec string
 	for {
 		switch {
@@ -84,4 +86,3 @@ func collate (in0 chan string, in1 chan string,  out chan string) {
 		}
 	}
 }
-
