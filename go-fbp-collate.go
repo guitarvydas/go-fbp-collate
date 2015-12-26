@@ -26,39 +26,40 @@ package main
 import "fmt"
 
 func main() {
+	fmt.Println("Ports as explicit func arguments")
 	c1 := make(chan string, 5)
 	c2 := make(chan string, 5)
 	c3 := make(chan string, 5)
-	go collate([]<-chan string{c1, c2}, []chan<- string{c3})
-	go headerReader(nil, []chan<- string{c1})
-	go recordReader(nil, []chan<- string{c2})
-	resultPrinter([]<-chan string{c3}, nil)
+	go collate(c1, c2, c3)
+	go headerReader(c1)
+	go recordReader(c2)
+	resultPrinter(c3)
 }
 
-func headerReader(in []<-chan string, out []chan<- string) {
+func headerReader(out chan<- string) {
 	// fake reading of headers from a file, just generate some headers
-	out[0] <- "A"
-	out[0] <- "B"
-	out[0] <- "C"
+	out <- "A"
+	out <- "B"
+	out <- "C"
 }
 
-func recordReader(in []<-chan string, out []chan<- string) {
+func recordReader(out chan<- string) {
 	// fake reading records - first character is the key (header)
 	for i := 0; i < 5; i++ {
-		out[0] <- fmt.Sprintf("A ++%v++", i)
+		out <- fmt.Sprintf("A ++%v++", i)
 	}
 	for i := 15; i < 21; i++ {
-		out[0] <- fmt.Sprintf("B ++%v++", i)
+		out <- fmt.Sprintf("B ++%v++", i)
 	}
 	for i := 25; i < 32; i++ {
-		out[0] <- fmt.Sprintf("C ++%v++", i)
+		out <- fmt.Sprintf("C ++%v++", i)
 	}
-	out[0] <- "EOF"
+	out <- "EOF"
 }
 
-func resultPrinter(in []<-chan string, out []chan<- string) {
+func resultPrinter(in <-chan string) {
 	for {
-		merged := <-in[0]
+		merged := <-in
 		if merged == "EOF" {
 			break
 		}
@@ -66,23 +67,23 @@ func resultPrinter(in []<-chan string, out []chan<- string) {
 	}
 }
 
-func collate(in []<-chan string, out []chan<- string) {
+func collate(in0 <-chan string, in1 <-chan string, out chan<- string) {
 	var hdr, rec string
 	for {
 		switch {
 		case rec == "EOF":
-			out[0] <- rec
+			out <- rec
 			break
 		case hdr == "":
-			hdr = <-in[0]
-			out[0] <- fmt.Sprintf("header %s", hdr)
+			hdr = <-in0
+			out <- fmt.Sprintf("header %s", hdr)
 		case rec != "" && rec[0] == hdr[0]:
-			out[0] <- fmt.Sprintf("record /%s/", rec[1:])
-			rec = <-in[1]
+			out <- fmt.Sprintf("record /%s/", rec[1:])
+			rec = <-in1
 		case rec != "" && rec[0] != hdr[0]:
 			hdr = ""
 		case rec == "":
-			rec = <-in[1]
+			rec = <-in1
 		}
 	}
 }
