@@ -26,40 +26,40 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("Ports as arrays of channels")
+	fmt.Println("Ports as maps of channels")
 	c1 := make(chan string, 5)
 	c2 := make(chan string, 5)
 	c3 := make(chan string, 5)
-	go collate([]<-chan string{c1, c2}, []chan<- string{c3})
-	go headerReader(nil, []chan<- string{c1})
-	go recordReader(nil, []chan<- string{c2})
-	resultPrinter([]<-chan string{c3}, nil)
+	go collate(map[string]<-chan string{"in0": c1, "in1": c2}, map[string]chan<- string{"out": c3})
+	go headerReader(nil, map[string]chan<- string{"out": c1})
+	go recordReader(nil, map[string]chan<- string{"out": c2})
+	resultPrinter(map[string]<-chan string{"in": c3}, nil)
 }
 
-func headerReader(in []<-chan string, out []chan<- string) {
+func headerReader(in map[string]<-chan string, out map[string]chan<- string) {
 	// fake reading of headers from a file, just generate some headers
-	out[0] <- "A"
-	out[0] <- "B"
-	out[0] <- "C"
+	out["out"] <- "A"
+	out["out"] <- "B"
+	out["out"] <- "C"
 }
 
-func recordReader(in []<-chan string, out []chan<- string) {
+func recordReader(in map[string]<-chan string, out map[string]chan<- string) {
 	// fake reading records - first character is the key (header)
 	for i := 0; i < 5; i++ {
-		out[0] <- fmt.Sprintf("A ++%v++", i)
+		out["out"] <- fmt.Sprintf("A ++%v++", i)
 	}
 	for i := 15; i < 21; i++ {
-		out[0] <- fmt.Sprintf("B ++%v++", i)
+		out["out"] <- fmt.Sprintf("B ++%v++", i)
 	}
 	for i := 25; i < 32; i++ {
-		out[0] <- fmt.Sprintf("C ++%v++", i)
+		out["out"] <- fmt.Sprintf("C ++%v++", i)
 	}
-	out[0] <- "EOF"
+	out["out"] <- "EOF"
 }
 
-func resultPrinter(in []<-chan string, out []chan<- string) {
+func resultPrinter(in map[string]<-chan string, out map[string]chan<- string) {
 	for {
-		merged := <-in[0]
+		merged := <-in["in"]
 		if merged == "EOF" {
 			break
 		}
@@ -67,23 +67,23 @@ func resultPrinter(in []<-chan string, out []chan<- string) {
 	}
 }
 
-func collate(in []<-chan string, out []chan<- string) {
+func collate(in map[string]<-chan string, out map[string]chan<- string) {
 	var hdr, rec string
 	for {
 		switch {
 		case rec == "EOF":
-			out[0] <- rec
+			out["out"] <- rec
 			break
 		case hdr == "":
-			hdr = <-in[0]
-			out[0] <- fmt.Sprintf("header %s", hdr)
+			hdr = <-in["in0"]
+			out["out"] <- fmt.Sprintf("header %s", hdr)
 		case rec != "" && rec[0] == hdr[0]:
-			out[0] <- fmt.Sprintf("record /%s/", rec[1:])
-			rec = <-in[1]
+			out["out"] <- fmt.Sprintf("record /%s/", rec[1:])
+			rec = <-in["in1"]
 		case rec != "" && rec[0] != hdr[0]:
 			hdr = ""
 		case rec == "":
-			rec = <-in[1]
+			rec = <-in["in1"]
 		}
 	}
 }
