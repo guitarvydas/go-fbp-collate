@@ -26,6 +26,7 @@ package main
 import "fmt"
 
 func main() {
+	fmt.Println("Ports as arrays of channels")
 	c1 := make(chan string, 5)
 	c2 := make(chan string, 5)
 	c3 := make(chan string, 5)
