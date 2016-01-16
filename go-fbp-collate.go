@@ -3,87 +3,50 @@
 //  +---+
 //  | A |---+       +----------+
 //  +---+   |       |          |       +--------+
-//          +------>|0         |       |        |
+//          +------>|in[0]     |       |        |
 //                  |    C  out|------>|    D   |
-//          +------>|1         |       |        |
+//          +------>|in[1]     |       |        |
 //  +---+   |       |          |       +--------+
 //  | B |---+       +----------+
 //  +---+
 //
-// Component A produces "headers".  Component B produces data keyed by headers (sorted).  Component C
-// Collates the output from A and B and sends the merged output to D.  C reads a header from A, then keeps
-// reading data records from B until the key changes.  Then, C reads the next header from A and repeats.
-//
-// The implementation below shows only the "happy" case.  Edge cases, e.g. what happens when B skips over
-// a header, are not implemented below, but it should be clear how such logic could be added.
-//
-// This implementation explicitly creates Go channels for A to C, B to C and C to D, then passes theses
-// channels as parameters to the various components, thereby "wiring up" the diagram.
-//
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"github.com/guitarvydas/collate"
+	"github.com/guitarvydas/ip"
+	"github.com/guitarvydas/printer"
+	"github.com/guitarvydas/readfile"
+)
 
 func main() {
 	fmt.Println("Ports as explicit func arguments")
-	c1 := make(chan string, 5)
-	c2 := make(chan string, 5)
-	c3 := make(chan string, 5)
-	go collate(c1, c2, c3)
-	go headerReader(c1)
-	go recordReader(c2)
-	resultPrinter(c3)
+	msource := make(chan string)
+	dsource := make(chan string)
+	ctl := make(chan string)
+
+	inCollate := arrayPort(2, 5) // array[2], bounds=5
+	outCollate := make(chan ip.IP, 5)
+
+	// wire up the components and start them
+	go collate.Collate("Collate", ctl, inCollate, outCollate)
+	go readfile.Read("Read Master", msource, inCollate[0])
+	go readfile.Read("Read Details", dsource, inCollate[1])
+
+	// send initialize's
+	ctl <- "3,2,5"
+	msource <- "mfile.txt"
+	dsource <- "dfile.txt"
+
+	printer.Print(outCollate)
 }
 
-func headerReader(out chan<- string) {
-	// fake reading of headers from a file, just generate some headers
-	out <- "A"
-	out <- "B"
-	out <- "C"
-}
-
-func recordReader(out chan<- string) {
-	// fake reading records - first character is the key (header)
-	for i := 0; i < 5; i++ {
-		out <- fmt.Sprintf("A ++%v++", i)
+func arrayPort(n, bound int) []chan ip.IP {
+	a := make([]chan ip.IP, n)
+	for i := 0; i < n; i++ {
+		a[i] = make(chan ip.IP, bound)
 	}
-	for i := 15; i < 21; i++ {
-		out <- fmt.Sprintf("B ++%v++", i)
-	}
-	for i := 25; i < 32; i++ {
-		out <- fmt.Sprintf("C ++%v++", i)
-	}
-	out <- "EOF"
-}
-
-func resultPrinter(in <-chan string) {
-	for {
-		merged := <-in
-		if merged == "EOF" {
-			break
-		}
-		fmt.Println(merged)
-	}
-}
-
-func collate(in0 <-chan string, in1 <-chan string, out chan<- string) {
-	var hdr, rec string
-	for {
-		switch {
-		case rec == "EOF":
-			out <- rec
-			break
-		case hdr == "":
-			hdr = <-in0
-			out <- fmt.Sprintf("header %s", hdr)
-		case rec != "" && rec[0] == hdr[0]:
-			out <- fmt.Sprintf("record /%s/", rec[1:])
-			rec = <-in1
-		case rec != "" && rec[0] != hdr[0]:
-			hdr = ""
-		case rec == "":
-			rec = <-in1
-		}
-	}
+	return a
 }
