@@ -7,3 +7,12 @@ Each FBP component resides in its own sub-directory.
 The code for Component.java was used as a guide / spec.  
 
 The point of this exercise was not to build a robust Collate, but as a proof of concept - how this would look in Go.
+
+
+To use this project, you also need the github components:
+
+ip
+collate
+readfile
+printer
+
